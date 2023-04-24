@@ -75,7 +75,7 @@ print("Vocabulary:")
 print(list(model.wv.key_to_index.keys()))
 
 # Get the word vector for a specific word
-word = 'tutela'
+word = 'pagamento'
 if word in model.wv:
     print("Word vector for the word " + word + ":")
     print(model.wv[word])

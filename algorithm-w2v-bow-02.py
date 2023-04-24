@@ -78,14 +78,14 @@ for file in files:
 
 # Train a Word2Vec model using the filtered sentences
 tokenized_sentences = [sentence.split() for sentence in filtered_sentences]
-model = Word2Vec(tokenized_sentences, min_count=1)
+model = Word2Vec(tokenized_sentences, min_count=1, workers=2)
 
 # Print the vocabulary
 print("Vocabulary:")
 print(list(model.wv.key_to_index.keys()))
 
 # Get the word vector for a specific word
-word = 'tutela'
+word = 'pagamento'
 if word in model.wv:
     print("Word vector for the word " + word + ":")
     print(model.wv[word])
