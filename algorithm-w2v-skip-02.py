@@ -1,11 +1,12 @@
-# Algorithm w2v 01 - bag of words - 01 - dataset extract and create a bag of words
+# Algorithm w2v - Skip-gram - 01 - dataset extract and create a skip-gram
 
 # Imports
 import os
 import nltk
-from nltk import sent_tokenize, word_tokenize
+from nltk.tokenize import sent_tokenize, word_tokenize
 from nltk.corpus import stopwords
 from string import punctuation
+from nltk.stem import PorterStemmer
 from gensim.models import Word2Vec
 import re
 
@@ -15,6 +16,9 @@ nltk.download('stopwords')
 
 # Define the list of stopwords for the Portuguese language
 stop_words = set(stopwords.words('portuguese'))
+
+# Create the Stemmer
+stemmer = PorterStemmer()
 
 # Use double backslashes in file or directory path
 path = "C:\\Dataset"
@@ -49,7 +53,7 @@ for file in files:
             # Tokenize each sentence into words
             words = word_tokenize(sentence.lower())
 
-            # Remove stop words
+            # Remove stop words and punctuation
             filtered_words = [
                 word
                 for word in words
@@ -57,15 +61,17 @@ for file in files:
                    word not in punctuation
             ]
 
-            # Put the filtered words together into a sentence again
-            filtered_sentence = ' '.join(filtered_words)
+            # Apply stemming to each word
+            words_stemming = [
+                stemmer.stem(word)
+                for word in filtered_words
+            ]
 
             # Add the filtered sentence to the list
-            filtered_sentences.append(filtered_words)
+            filtered_sentences.append(words_stemming)
 
 # Build vocabulary
-model = Word2Vec(filtered_sentences, min_count=1, workers=2)
-model.build_vocab(filtered_sentences)
+model = Word2Vec(filtered_sentences, min_count=1, workers=2, sg=1, window=5)
 
 # Train a Word2Vec model using the filtered sentences
 model.train(filtered_sentences, total_examples=model.corpus_count, epochs=model.epochs)
@@ -75,9 +81,7 @@ print("Vocabulary:")
 print(list(model.wv.key_to_index.keys()))
 
 # Get the word vector for a specific word
-word = 'pagamento'
-if word in model.wv:
-    print("Word vector for the word " + word + ":")
+for word in model.wv.key_to_index.keys():
+    print("Word vector for the word => " + word + ":")
     print(model.wv[word])
-else:
-    print("Word '" + word + "' not in vocabulary.")
+

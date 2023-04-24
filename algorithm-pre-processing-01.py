@@ -1,4 +1,4 @@
-# Algorithm w2v 02 - bag of words - 01 - dataset extract and create a bag of words
+# Algorithm 1 - dataset cleaning and pre-processing
 
 # Imports
 import os
@@ -7,7 +7,6 @@ from nltk.tokenize import sent_tokenize, word_tokenize
 from nltk.corpus import stopwords
 from string import punctuation
 from nltk.stem import PorterStemmer
-from gensim.models import Word2Vec
 
 # Downloads
 nltk.download('punkt')
@@ -40,11 +39,8 @@ for file in files:
         # Tokenize the content in the sentences
         sentences = sent_tokenize(content)
 
-        # Flag for tokenizing and stemming the sentences after the keyword "RELATÓRIO"
+        # Flag for tokenizing and stemming the sentences after the keyword "ACORDAM"
         tokenize_after_keyword = False
-
-        # List to store the filtered sentences
-        filtered_sentences = []
 
         # Print sentences without stop words
         print("Sentences in the file " + file + " without stop words:")
@@ -73,22 +69,5 @@ for file in files:
                 # Put the filtered words together into a sentence again
                 filtered_sentence = ' '.join(words_stemming)
 
-                # Add the filtered sentence to the list
-                filtered_sentences.append(filtered_sentence)
-
-# Train a Word2Vec model using the filtered sentences
-tokenized_sentences = [sentence.split() for sentence in filtered_sentences]
-model = Word2Vec(tokenized_sentences, min_count=1, workers=2)
-
-# Print the vocabulary
-print("Vocabulary:")
-print(list(model.wv.key_to_index.keys()))
-
-# Get the word vector for a specific word
-word = 'pagamento'
-if word in model.wv:
-    print("Word vector for the word " + word + ":")
-    print(model.wv[word])
-else:
-    print("Word '" + word + "' not in vocabulary.")
-
+                # Print the sentences
+                print(filtered_sentence)
