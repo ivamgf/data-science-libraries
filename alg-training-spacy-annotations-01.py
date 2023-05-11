@@ -1,16 +1,19 @@
+# Annotation training algorithm - 01
+
+# Imports
 import spacy
 from spacy.lang.pt import Portuguese
 
-# Criar um novo modelo em branco
+# Create a new blank template
 nlp = spacy.blank('pt')
 
-# Adicionar um novo rótulo de anotação personalizado
+# Add a New Custom Note Label
 nlp.add_label('MINHA_ENTIDADE')
 
-# Definir a lista de palavras específicas
+# Define the list of specific words
 palavras_especificas = ['palavra1', 'palavra2', 'palavra3']
 
-# Criar o pipeline personalizado
+# Create the custom pipeline
 def meu_pipe(doc):
     entidades = []
     for token in doc:
@@ -19,17 +22,17 @@ def meu_pipe(doc):
     doc.ents = entidades
     return doc
 
-# Adicionar o pipeline personalizado ao modelo
+# Add the Custom Pipeline to the Template
 nlp.add_pipe(meu_pipe, last=True)
 
-# Definir os dados de treinamento
+# Set the training data
 dados_treinamento = {
     'texto1': [(0, 7, 'MINHA_ENTIDADE')],
     'texto2': [(8, 15, 'MINHA_ENTIDADE')],
     'texto3': [(16, 24, 'MINHA_ENTIDADE')]
 }
 
-# Iniciar o treinamento do modelo
+# Start model training
 n_iter = 10
 for i in range(n_iter):
     perda = {}
@@ -40,7 +43,7 @@ for i in range(n_iter):
         nlp.update(texts, annotations, losses=perda)
     print(perda)
 
-# Testar o modelo treinado em um conjunto de dados de teste
+# Test the trained model on a test dataset
 dados_teste = {
     'texto4': [],
     'texto5': [],
