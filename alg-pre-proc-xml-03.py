@@ -49,6 +49,9 @@ for file in files:
                     f"Instance='{instance}' "
                     f"Value='{value}'>"
                 )
-                if element.text:
-                    print(element.text.strip())
-                print(f"</webanno.custom.Judgmentsentity>")
+                # Iterate over the element's children and print their text content
+                for child in element:
+                    if child.text:
+                        print(child.text.strip())
+
+                print("</webanno.custom.Judgmentsentity>")
