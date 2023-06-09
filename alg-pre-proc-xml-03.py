@@ -52,6 +52,6 @@ for file in files:
                 # Iterate over the element's children and print their text content
                 for child in element:
                     if child.text:
-                        print(child.text.strip())
+                        print(child.text.strip() + "<" + instance + ">" + "<" + value + ">")
 
                 print("</webanno.custom.Judgmentsentity>")
