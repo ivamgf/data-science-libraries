@@ -1,41 +1,45 @@
-# Algorithm 4 - dataset cleaning and pre-processing XML
+# Algorithm 5 - dataset cleaning and pre-processing XML
 
 # Imports
 import os
 import nltk
-import json
 import re
 import xml.etree.ElementTree as ET
+import spacy
 
 # Downloads
 nltk.download('punkt')
 
 # Use double backslashes in file or directory path
 path = "C:\\Dataset-TRT"
-imports_path = "C:\\Imports\\instances.json"
 
 # Get a list of files in the directory
 files = os.listdir(path)
 
-# Load word replacements from JSON
-with open(imports_path, "r", encoding="utf-8") as json_file:
-    word_replacements = json.load(json_file)
+# Load SpaCy language model
+nlp = spacy.load("pt_core_news_sm")
 
 # Function to replace words in a text
 def replace_words(text):
+    word_replacements = {
+        "LimitaÃ§Ã£o da condenaÃ§Ã£o aos valores dos pedidos": "Limitacao da condenacao aos valores dos pedidos",
+        "AssÃ©dio moral": "Assedio moral",
+        "HonorÃ¡rios sucumbenciais": "Honorarios sucumbenciais",
+        "Estabilidade acidentÃ¡ria": "Estabilidade acidentaria",
+        "DoenÃ§a ocupacional": "Doenca ocupacional"
+    }
     for old_word, new_word in word_replacements.items():
-        if isinstance(new_word, list):
-            if text in new_word:
-                text = new_word[new_word.index(text)]
-        else:
-            text = new_word if text == old_word else text
+        text = text.replace(old_word, new_word)
     return text
 
 # Function to replace expressions in the console output
 def replace_expression(text):
     expressions = {
         "LimitaÃ§Ã£o da condenaÃ§Ã£o aos valores dos pedidos": "Limitacao da condenacao aos valores dos pedidos",
-        "AssÃ©dio moral": "Assedio moral"
+        "AssÃ©dio moral": "Assedio moral",
+        "HonorÃ¡rios sucumbenciais": "Honorarios sucumbenciais",
+        "Estabilidade acidentÃ¡ria": "Estabilidade acidentaria",
+        "DoenÃ§a ocupacional": "Doenca ocupacional"
     }
     for expression, replacement in expressions.items():
         text = text.replace(expression, replacement)
@@ -56,11 +60,11 @@ for file in files:
         print("Conteúdo do arquivo " + file + ":")
         for element in root.iter("webanno.custom.Judgmentsentity"):
             if (
-                "sofa" in element.attrib and
-                "begin" in element.attrib and
-                "end" in element.attrib and
-                "Instance" in element.attrib and
-                "Value" in element.attrib
+                    "sofa" in element.attrib and
+                    "begin" in element.attrib and
+                    "end" in element.attrib and
+                    "Instance" in element.attrib and
+                    "Value" in element.attrib
             ):
                 sofa = element.attrib["sofa"]
                 begin = element.attrib["begin"]
@@ -68,7 +72,7 @@ for file in files:
                 instance = element.attrib["Instance"]
                 value = element.attrib["Value"]
 
-                # Replace values from JSON
+                # Replace values
                 instance = replace_words(instance)
                 value = replace_words(value)
 
@@ -81,9 +85,13 @@ for file in files:
                         # Replace expressions in the text
                         text = replace_expression(text)
 
-                        # Print the replaced text and attributes
+                        # Tokenize the text using SpaCy
+                        doc = nlp(text)
+                        tokens = [token.text for token in doc]
+
+                        # Print the tokens and attributes
                         print(
-                            text.encode("utf-8").decode("utf-8") +
+                            str(tokens) +
                             "<" + instance.encode("utf-8").decode("utf-8") +
                             ">" + "<" + value.encode("utf-8").decode("utf-8") + ">"
                         )
