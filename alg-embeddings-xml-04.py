@@ -114,12 +114,19 @@ for file in files:
                 output_html += "<p>Word Embedding:</p>"
                 output_html += f"<pre>{model.wv[word]}</pre>"
 
-                # Criar char embeddings para o token
+                # Create char embeddings for the token
                 char_embeddings = create_char_embeddings(word)
 
-                # Imprimir char embeddings
+                # Concatenate word and char embeddings
+                combined_embeddings = np.concatenate((model.wv[word], char_embeddings), axis=None)
+
+                # Print char embeddings
                 output_html += "<p>Char Embedding:</p>"
                 output_html += f"<pre>{char_embeddings}</pre>"
+
+                # Print the concatenated embeddings
+                output_html += "<p>Concatenated Embedding:</p>"
+                output_html += f"<pre>{combined_embeddings}</pre>"
         else:
             output_html += "<p>Nenhuma sentença encontrada para treinar o modelo Word2Vec.</p>"
 
