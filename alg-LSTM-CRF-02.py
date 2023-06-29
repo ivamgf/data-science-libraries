@@ -1,4 +1,4 @@
-# Algorithm 1 - dataset cleaning, pre-processing XML and create embeddings
+# Algorithm 2 - dataset cleaning, pre-processing XML and create embeddings
 # Implemented RNN with LSTMs
 # Results in file and browser
 
@@ -11,7 +11,10 @@ from gensim.models import Word2Vec
 from datetime import datetime
 import hashlib
 import webbrowser
-import tensorflow as tf
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torchcrf import CRF
 import numpy as np
 
 nltk.download('punkt')
@@ -139,25 +142,51 @@ for file in files:
                 sequence_length = 1
 
                 # Create LSTM model
-                lstm_model = tf.keras.Sequential()
-                lstm_model.add(tf.keras.layers.LSTM(hidden_size, input_shape=(sequence_length, input_size)))
-                lstm_model.add(tf.keras.layers.Dense(num_classes, activation='softmax'))
+                lstm_model = nn.Sequential(
+                    nn.LSTM(input_size, hidden_size, batch_first=True, bidirectional=True),
+                    nn.Linear(hidden_size * 2, num_classes)
+                )
 
-                # Compile the model
-                lstm_model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+                # Create CRF layer
+                crf_layer = CRF(num_classes)
+
+                # Apply CRF layer to the LSTM output
+                def forward_pass(inputs):
+                    lstm_output, _ = lstm_model(inputs)
+                    crf_output = crf_layer(lstm_output)
+                    return crf_output
+
+                # Create model
+                lstm_crf_model = forward_pass
+
+                # Set device
+                device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+                lstm_crf_model.to(device)
+
+                # Define optimizer and loss function
+                optimizer = optim.Adam(lstm_crf_model.parameters())
+                loss_function = crf_layer.loss
 
                 # Generate example data
                 num_samples = 1
-                X = combined_embeddings  # No need for np.expand_dims
-                y = tf.random.uniform((num_samples, num_classes))
+                X = torch.Tensor(combined_embeddings).to(device)
+                y = torch.randint(num_classes, size=(num_samples, sequence_length)).to(device)
 
                 # Train the model
-                lstm_model.fit(X, y, epochs=10, batch_size=1)
+                num_epochs = 10
+                for epoch in range(num_epochs):
+                    lstm_crf_model.train()
+                    optimizer.zero_grad()
 
-                # Print LSTM model results
-                output_html += "<p>LSTM Model Results:</p>"
-                lstm_results = lstm_model.predict(X)
-                output_html += f"<pre>{lstm_results}</pre>"
+                    outputs = lstm_crf_model(X)
+                    loss = loss_function(outputs, y)
+                    loss.backward()
+                    optimizer.step()
+
+                # Print LSTM-CRF model results
+                output_html += "<p>LSTM-CRF Model Results:</p>"
+                lstm_crf_results = lstm_crf_model(X)
+                output_html += f"<pre>{lstm_crf_results}</pre>"
 
         else:
             output_html += "<p>Nenhuma sentença encontrada para treinar o modelo Word2Vec.</p>"

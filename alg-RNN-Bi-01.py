@@ -1,5 +1,5 @@
 # Algorithm 1 - dataset cleaning, pre-processing XML and create embeddings
-# Implemented RNN with LSTMs
+# Implemented RNN with Bidirectional LSTMs
 # Results in file and browser
 
 # Imports
@@ -121,7 +121,7 @@ for file in files:
                 # Concatenate word and char embeddings
                 combined = np.concatenate((model.wv[word], char_embeddings), axis=None)
 
-                # Reshape the combined embeddings to match the expected input shape of the LSTM layer
+                # Reshape the combined embeddings to match the expected input shape of the Bidirectional LSTM layer
                 combined_embeddings = np.reshape(combined, (1, 1, -1))
 
                 # Print char embeddings
@@ -132,15 +132,15 @@ for file in files:
                 output_html += "<p>Concatenated Embedding:</p>"
                 output_html += f"<pre>{combined_embeddings}</pre>"
 
-                # LSTM model
+                # Bidirectional LSTM model
                 input_size = combined_embeddings.shape[-1]  # Updated input size
                 hidden_size = 64
                 num_classes = 10
                 sequence_length = 1
 
-                # Create LSTM model
+                # Create Bidirectional LSTM model
                 lstm_model = tf.keras.Sequential()
-                lstm_model.add(tf.keras.layers.LSTM(hidden_size, input_shape=(sequence_length, input_size)))
+                lstm_model.add(tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(hidden_size), input_shape=(sequence_length, input_size)))
                 lstm_model.add(tf.keras.layers.Dense(num_classes, activation='softmax'))
 
                 # Compile the model
@@ -155,7 +155,7 @@ for file in files:
                 lstm_model.fit(X, y, epochs=10, batch_size=1)
 
                 # Print LSTM model results
-                output_html += "<p>LSTM Model Results:</p>"
+                output_html += "<p>Bidirectional LSTM Model Results:</p>"
                 lstm_results = lstm_model.predict(X)
                 output_html += f"<pre>{lstm_results}</pre>"
 

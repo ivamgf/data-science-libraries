@@ -13,6 +13,7 @@ import hashlib
 import webbrowser
 import tensorflow as tf
 import numpy as np
+from tf2crf import CRF
 
 nltk.download('punkt')
 
@@ -140,24 +141,39 @@ for file in files:
 
                 # Create LSTM model
                 lstm_model = tf.keras.Sequential()
-                lstm_model.add(tf.keras.layers.LSTM(hidden_size, input_shape=(sequence_length, input_size)))
+                lstm_model.add(tf.keras.layers.LSTM(hidden_size, input_shape=(sequence_length, input_size), return_sequences=True))
                 lstm_model.add(tf.keras.layers.Dense(num_classes, activation='softmax'))
 
+                # Create CRF layer
+                crf_layer = CRF(num_classes)
+
+                # Apply CRF layer to the LSTM output
+                crf_output = crf_layer(lstm_model.output)
+
+
+                def crf_loss(y_true, y_pred):
+                    crf_layer = y_pred._keras_mask
+                    crf_loss = -crf_layer.log_prob(y_true)
+                    return tf.reduce_mean(crf_loss)
+
+                # Create model
+                lstm_crf_model = tf.keras.Model(inputs=lstm_model.input, outputs=crf_output)
+
                 # Compile the model
-                lstm_model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+                lstm_crf_model.compile(optimizer='adam', loss=crf_loss)
 
                 # Generate example data
                 num_samples = 1
                 X = combined_embeddings  # No need for np.expand_dims
-                y = tf.random.uniform((num_samples, num_classes))
+                y = np.random.randint(num_classes, size=(num_samples, sequence_length))
 
                 # Train the model
-                lstm_model.fit(X, y, epochs=10, batch_size=1)
+                lstm_crf_model.fit(X, y, epochs=10, batch_size=1)
 
-                # Print LSTM model results
-                output_html += "<p>LSTM Model Results:</p>"
-                lstm_results = lstm_model.predict(X)
-                output_html += f"<pre>{lstm_results}</pre>"
+                # Print LSTM-CRF model results
+                output_html += "<p>LSTM-CRF Model Results:</p>"
+                lstm_crf_results = lstm_crf_model.predict(X)
+                output_html += f"<pre>{lstm_crf_results}</pre>"
 
         else:
             output_html += "<p>Nenhuma sentença encontrada para treinar o modelo Word2Vec.</p>"

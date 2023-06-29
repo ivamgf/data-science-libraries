@@ -1,5 +1,5 @@
-# Algorithm 1 - dataset cleaning, pre-processing XML and create embeddings
-# Implemented RNN with LSTMs
+# Algorithm 2 - dataset cleaning, pre-processing XML and create embeddings
+# Implemented RNN with LSTMs and CRF
 # Results in file and browser
 
 # Imports
@@ -12,7 +12,9 @@ from datetime import datetime
 import hashlib
 import webbrowser
 import tensorflow as tf
+import tensorflow_addons as tfa
 import numpy as np
+from tensorflow_addons.layers import CRF
 
 nltk.download('punkt')
 
@@ -139,25 +141,48 @@ for file in files:
                 sequence_length = 1
 
                 # Create LSTM model
-                lstm_model = tf.keras.Sequential()
-                lstm_model.add(tf.keras.layers.LSTM(hidden_size, input_shape=(sequence_length, input_size)))
-                lstm_model.add(tf.keras.layers.Dense(num_classes, activation='softmax'))
+                inputs = tf.keras.Input(shape=(sequence_length, input_size))
+                lstm_output = tf.keras.layers.LSTM(hidden_size, return_sequences=True)(inputs)
+                crf_layer = tfa.layers.CRF(num_classes, sparse_target=True)  # Set sparse_target to True
+                crf_output = crf_layer(lstm_output)
+
+                # Add a Dense layer after the CRF layer
+                dense_output = tf.keras.layers.Dense(num_classes)(crf_output)
+
+                # Create model
+                lstm_crf_model = tf.keras.Model(inputs=inputs, outputs=dense_output)
+
+
+                # Define the loss function for the model
+                def crf_loss(y_true, y_pred):
+                    log_likelihood, _ = crf_layer(y_pred, y_true)
+                    return -tf.reduce_mean(log_likelihood)
+
+
+                # Define the accuracy function for the model
+                def crf_accuracy(y_true, y_pred):
+                    y_pred = tf.argmax(y_pred, axis=-1)
+                    mask = tf.math.not_equal(y_true, 0)
+                    y_true = tf.boolean_mask(y_true, mask)
+                    y_pred = tf.boolean_mask(y_pred, mask)
+                    accuracy = tf.reduce_mean(tf.cast(tf.equal(y_true, y_pred), tf.float32))
+                    return accuracy
 
                 # Compile the model
-                lstm_model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+                lstm_crf_model.compile(loss=crf_loss, optimizer='adam', metrics=[crf_accuracy])
 
                 # Generate example data
                 num_samples = 1
                 X = combined_embeddings  # No need for np.expand_dims
-                y = tf.random.uniform((num_samples, num_classes))
+                y = tf.random.uniform((num_samples, sequence_length))
 
                 # Train the model
-                lstm_model.fit(X, y, epochs=10, batch_size=1)
+                lstm_crf_model.fit(X, y, epochs=10, batch_size=1)
 
-                # Print LSTM model results
-                output_html += "<p>LSTM Model Results:</p>"
-                lstm_results = lstm_model.predict(X)
-                output_html += f"<pre>{lstm_results}</pre>"
+                # Print LSTM-CRF model results
+                output_html += "<p>LSTM-CRF Model Results:</p>"
+                lstm_crf_results = lstm_crf_model.predict(X)
+                output_html += f"<pre>{lstm_crf_results}</pre>"
 
         else:
             output_html += "<p>Nenhuma sentença encontrada para treinar o modelo Word2Vec.</p>"
