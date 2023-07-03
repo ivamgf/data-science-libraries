@@ -1,4 +1,4 @@
-# Algorithm 2 - dataset cleaning, pre-processing XML and create embeddings
+# Algorithm 4 - dataset cleaning, pre-processing XML and create embeddings
 # Implemented RNN with Bidirectional LSTMs
 # Results in file and browser
 
@@ -102,6 +102,15 @@ for file in files:
                         tokens = [token.text for token in doc]
                         sentences.append(tokens)
 
+                        # Print the selected words before and after the tag
+                        if len(sentences) == 5:
+                            before_words = sentences[-5:]
+                            after_words = tokens[:5]
+                            print("5 palavras antes:", before_words)
+                            print("Token:", tokens)
+                            print("5 palavras depois:", after_words)
+                            print()
+
         if len(sentences) > 0:
             model = Word2Vec(sentences, min_count=1, workers=2, sg=1, window=5)
             model.build_vocab(sentences)
@@ -113,7 +122,6 @@ for file in files:
                 output_html += f"<p>Instance: {instance}</p>"
                 output_html += f"<p>Value: {value}</p>"
                 output_html += "<p>Word Embedding:</p>"
-
                 output_html += f"<pre>{model.wv[word]}</pre>"
 
                 # Create char embeddings for the token
@@ -175,4 +183,3 @@ with open(output_file_html, "w", encoding="utf-8") as f:
 webbrowser.open(output_file_html)
 
 print("Results saved in folder C://Outputs")
-

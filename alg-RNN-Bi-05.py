@@ -1,4 +1,4 @@
-# Algorithm 2 - dataset cleaning, pre-processing XML and create embeddings
+# Algorithm 5 - dataset cleaning, pre-processing XML and create embeddings
 # Implemented RNN with Bidirectional LSTMs
 # Results in file and browser
 
@@ -21,6 +21,7 @@ files = os.listdir(path)
 
 nlp = spacy.load("pt_core_news_sm")
 
+
 # Function to replace words
 def replace_words(text):
     word_replacements = {
@@ -33,6 +34,7 @@ def replace_words(text):
     for old_word, new_word in word_replacements.items():
         text = text.replace(old_word, new_word)
     return text
+
 
 # Function to replace expressions
 def replace_expression(text):
@@ -47,11 +49,13 @@ def replace_expression(text):
         text = text.replace(expression, replacement)
     return text
 
+
 # Function to create char embeddings
 def create_char_embeddings(word):
     char_indices = {char: i + 1 for i, char in enumerate(set(word))}
     text_indices = [char_indices[char] for char in word]
     return np.array(text_indices)
+
 
 output_dir = "C:\\Outputs"
 current_datetime = datetime.now()
@@ -76,13 +80,14 @@ for file in files:
 
         output_html += f"<h4>Conteúdo do arquivo {file}:</h4>"
         sentences = []
+        token_tags = []
         for element in root.iter("webanno.custom.Judgmentsentity"):
             if (
-                "sofa" in element.attrib and
-                "begin" in element.attrib and
-                "end" in element.attrib and
-                "Instance" in element.attrib and
-                "Value" in element.attrib
+                    "sofa" in element.attrib and
+                    "begin" in element.attrib and
+                    "end" in element.attrib and
+                    "Instance" in element.attrib and
+                    "Value" in element.attrib
             ):
                 sofa = element.attrib["sofa"]
                 begin = element.attrib["begin"]
@@ -101,6 +106,7 @@ for file in files:
                         doc = nlp(text)
                         tokens = [token.text for token in doc]
                         sentences.append(tokens)
+                        token_tags.append(child.tag)
 
         if len(sentences) > 0:
             model = Word2Vec(sentences, min_count=1, workers=2, sg=1, window=5)
@@ -108,7 +114,7 @@ for file in files:
             model.train(sentences, total_examples=model.corpus_count, epochs=model.epochs)
 
             output_html += "<h4>Vocabulary:</h4>"
-            for word in model.wv.key_to_index.keys():
+            for i, word in enumerate(model.wv.key_to_index.keys()):
                 output_html += f"<p>Token: {word}</p>"
                 output_html += f"<p>Instance: {instance}</p>"
                 output_html += f"<p>Value: {value}</p>"
@@ -133,6 +139,20 @@ for file in files:
                 output_html += "<p>Concatenated Embedding:</p>"
                 output_html += f"<pre>{combined_embeddings}</pre>"
 
+                # Print the content between <de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Token> tags
+                if i < len(token_tags):
+                    token_tag = token_tags[i]
+                    token_start_tag = f"<{token_tag}>"
+                    token_end_tag = f"</{token_tag}>"
+                    content_start = text.find(token_start_tag)
+                    content_end = text.find(token_end_tag, content_start + len(token_start_tag))
+                    if content_start != -1 and content_end != -1:
+                        content_start += len(token_start_tag)
+                        content = text[content_start:content_end].strip()
+                        output_html += f"<p>Content between tags: {content}</p>"
+                    else:
+                        output_html += "<p>Content between tags not found.</p>"
+
                 # Bidirectional LSTM model
                 input_size = combined_embeddings.shape[-1]  # Updated input size
                 hidden_size = 64
@@ -141,7 +161,8 @@ for file in files:
 
                 # Create Bidirectional LSTM model
                 lstm_model = tf.keras.Sequential()
-                lstm_model.add(tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(hidden_size), input_shape=(sequence_length, input_size)))
+                lstm_model.add(tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(hidden_size),
+                                                             input_shape=(sequence_length, input_size)))
                 lstm_model.add(tf.keras.layers.Dense(num_classes, activation='softmax'))
 
                 # Compile the model
@@ -175,4 +196,3 @@ with open(output_file_html, "w", encoding="utf-8") as f:
 webbrowser.open(output_file_html)
 
 print("Results saved in folder C://Outputs")
-
