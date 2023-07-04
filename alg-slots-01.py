@@ -1,5 +1,4 @@
-# Algorithm 2 - dataset cleaning, pre-processing XML and create embeddings
-# Implemented RNN with Bidirectional LSTMs
+# Algorithm 1 - dataset cleaning, pre-processing XML and create slots and embeddings
 # Results in file and browser
 
 # Imports
@@ -11,7 +10,6 @@ from gensim.models import Word2Vec
 from datetime import datetime
 import hashlib
 import webbrowser
-import tensorflow as tf
 import numpy as np
 
 nltk.download('punkt')
@@ -67,6 +65,8 @@ output_html = ""
 
 output_html += "<h3>Arquivos encontrados no diretório:</h3>"
 
+slot_number = 1
+
 for file in files:
     if file.endswith(".xml"):
         output_html += f"<p>{file}</p>"
@@ -102,77 +102,47 @@ for file in files:
                         tokens = [token.text for token in doc]
                         sentences.append(tokens)
 
-        if len(sentences) > 0:
-            model = Word2Vec(sentences, min_count=1, workers=2, sg=1, window=5)
-            model.build_vocab(sentences)
-            model.train(sentences, total_examples=model.corpus_count, epochs=model.epochs)
+                if len(sentences) > 0:
+                    model = Word2Vec(min_count=1, workers=2, sg=1)
+                    model.build_vocab(sentences)
+                    model.train(sentences, total_examples=model.corpus_count, epochs=model.epochs)
 
-            output_html += "<h4>Vocabulary:</h4>"
-            for word in model.wv.key_to_index.keys():
-                output_html += f"<p>Token: {word}</p>"
-                output_html += f"<p>Instance: {instance}</p>"
-                output_html += f"<p>Value: {value}</p>"
-                output_html += "<p>Word Embedding:</p>"
+                    output_html += "<h4>Vocabulary:</h4>"
+                    for word in model.wv.key_to_index.keys():
+                        output_html += f"<p>Slot: {slot_number}</p>"
+                        output_html += f"<p>Token: {word}</p>"
+                        output_html += f"<p>Instance: {instance}</p>"
+                        output_html += f"<p>Value: {value}</p>"
+                        output_html += "<p>Word Embedding:</p>"
+                        output_html += f"<pre>{model.wv[word]}</pre>"
 
-                output_html += f"<pre>{model.wv[word]}</pre>"
+                        # Create char embeddings for the token
+                        char_embeddings = create_char_embeddings(word)
 
-                # Create char embeddings for the token
-                char_embeddings = create_char_embeddings(word)
+                        # Concatenate word and char embeddings
+                        combined_embeddings = np.concatenate((model.wv[word], char_embeddings), axis=None)
 
-                # Concatenate word and char embeddings
-                combined = np.concatenate((model.wv[word], char_embeddings), axis=None)
+                        # Print char embeddings
+                        output_html += "<p>Char Embedding:</p>"
+                        output_html += f"<pre>{char_embeddings}</pre>"
 
-                # Reshape the combined embeddings to match the expected input shape of the Bidirectional LSTM layer
-                combined_embeddings = np.reshape(combined, (1, 1, -1))
+                        # Print the concatenated embeddings
+                        output_html += "<p>Concatenated Embedding:</p>"
+                        output_html += f"<pre>{combined_embeddings}</pre>"
 
-                # Print char embeddings
-                output_html += "<p>Char Embedding:</p>"
-                output_html += f"<pre>{char_embeddings}</pre>"
+                        slot_number += 1
+                else:
+                    output_html += "<p>Nenhuma sentença encontrada para treinar o modelo Word2Vec.</p>"
 
-                # Print the concatenated embeddings
-                output_html += "<p>Concatenated Embedding:</p>"
-                output_html += f"<pre>{combined_embeddings}</pre>"
-
-                # Bidirectional LSTM model
-                input_size = combined_embeddings.shape[-1]  # Updated input size
-                hidden_size = 64
-                num_classes = 10
-                sequence_length = 1
-
-                # Create Bidirectional LSTM model
-                lstm_model = tf.keras.Sequential()
-                lstm_model.add(tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(hidden_size), input_shape=(sequence_length, input_size)))
-                lstm_model.add(tf.keras.layers.Dense(num_classes, activation='softmax'))
-
-                # Compile the model
-                lstm_model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
-
-                # Generate example data
-                num_samples = 1
-                X = combined_embeddings  # No need for np.expand_dims
-                y = tf.random.uniform((num_samples, num_classes))
-
-                # Train the model
-                lstm_model.fit(X, y, epochs=10, batch_size=1)
-
-                # Print LSTM model results
-                output_html += "<p>Bidirectional LSTM Model Results:</p>"
-                lstm_results = lstm_model.predict(X)
-                output_html += f"<pre>{lstm_results}</pre>"
-
-        else:
-            output_html += "<p>Nenhuma sentença encontrada para treinar o modelo Word2Vec.</p>"
-
-# Save the results to output TXT file
+# Salva o resultado no arquivo de saída TXT
 with open(output_file_txt, "w", encoding="utf-8") as f:
     f.write(output_html)
 
-# Save the results to output HTML file
+# Salva o resultado no arquivo de saída HTML
 with open(output_file_html, "w", encoding="utf-8") as f:
     f.write(output_html)
 
-# Open the HTML file in the browser
+# Abre o arquivo HTML no navegador
 webbrowser.open(output_file_html)
 
 print("Results saved in folder C://Outputs")
-
