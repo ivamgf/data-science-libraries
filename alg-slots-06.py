@@ -119,7 +119,7 @@ for file in files:
                         context_text = ' '.join(context_words)
                         output_html += f"<p>Sentença {slot_number}: {context_text}</p>"
                         output_html += f"<p>Annotated Word: {annotated_word}</p>"
-                        output_html += f"<p>Tokens: {context_words}</p>"  # Print the token vector
+                        output_html += f"<p>Slot de Tokens {slot_number}: {context_words}</p>"  # Print the token vector
                         slot_number += 1
 
 # Output files path
