@@ -1,4 +1,4 @@
-# Algorithm 4 - Model training
+# Algorithm 5 - Model training
 # Dataset cleaning, pre-processing XML and create slots and embeddings
 # Results in file and browser
 
