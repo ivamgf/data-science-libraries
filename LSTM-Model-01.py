@@ -1,4 +1,4 @@
-# Algorithm 3 - BILSTM-CE Model training
+# Algorithm 2 - BILSTM-CE Model training
 # Dataset cleaning, pre-processing XML and create slots and embeddings
 # RNN Bidiretional LSTM Layer
 # Results in file and browser
@@ -73,15 +73,6 @@ def replace_expression(text):
         text = text.replace(expression, replacement)
     return text
 
-# Char Embedding Function
-def char_embedding(text):
-    embedding = np.zeros((20, 1))
-    for i, char in enumerate(text):
-        if i >= 20:
-            break
-        embedding[i] = ord(char)
-    return embedding
-
 # Tokenize the sentences into words and create skipgram Word2Vec
 def tokenize_sentence(sentence):
     tokens = word_tokenize(sentence)
@@ -91,20 +82,6 @@ def tokenize_sentence(sentence):
     model = Word2Vec(sentences=[tokens], min_count=1, workers=2, sg=1, window=5)
 
     return model
-
-class LSTMModel(tf.keras.models.Sequential):
-    def __init__(self, target_shape):
-        super(LSTMModel, self).__init__()
-        self.target_shape = target_shape
-
-    def get_num_digits(self):
-        num_digits = 1
-        if np.prod(self.target_shape) > 0 and not np.isinf(np.prod(self.target_shape)):
-            num_digits = int(np.log10(np.prod(self.target_shape))) + 1
-        return num_digits
-
-    def compile(self, *args, **kwargs):
-        super(LSTMModel, self).compile(*args, **kwargs)
 
 # Loop through files in directory
 for file in files:
@@ -186,77 +163,45 @@ for file in files:
                             output_html += f"<p>{word}: {word_embedding}</p>"
                         output_html += "</pre>"
 
-                        # Char Embeddings
-                        for word in context_words:
-                            output_html += f"<p>{word}: {char_embedding(word)}</p>"
-                        output_html += "</pre>"
-
-                        # Word and Char Embedding concatenated
-                        output_html += "<p>Word and Char Embedding concatenated:</p>"
-                        output_html += "<pre>"
-                        for word in context_words:
-                            word_embedding = tokenized_sent.wv[word].reshape((100, 1))
-                            char_emb = char_embedding(word)
-                            concatenated_emb = np.concatenate((word_embedding, char_emb))
-                            output_html += f"<p>{word}: {concatenated_emb}</p>"
-                        output_html += "</pre>"
-
                         # Bidirectional LSTM model
-                        input_size = concatenated_emb.shape[-1]
+                        input_size = word_embedding.shape[-1]
                         hidden_size = 64
                         num_classes = 10
                         sequence_length = 1
 
                         # Transpose input
-                        concatenated_emb = np.transpose(concatenated_emb, (1, 0))
+                        word_embedding = np.transpose(word_embedding, (1, 0))
 
                         # Generate example data
                         num_samples = 1
                         # Reshape the input data
-                        X = concatenated_emb.reshape((num_samples, 1, 120))
-                        y = tf.random.uniform((num_samples,) + concatenated_emb.shape)
+                        X = word_embedding.reshape((num_samples, 1, 100))
+                        y = tf.random.uniform((num_samples, num_classes))
 
-                        # Criar Bidirectional LSTM model
-                        lstm_model = LSTMModel(target_shape=y.shape[1:])  # Use o shape de y como target_shape
+                        # Create Bidirectional LSTM model
+                        lstm_model = tf.keras.Sequential()
+                        lstm_model.add(
+                            tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(
+                                hidden_size, input_shape=(1, 120), dropout=0.1)))
+                        lstm_model.add(tf.keras.layers.Dense(num_classes, activation='softmax'))
 
-                        # Obter o número de dígitos do target_shape
-                        num_digits = lstm_model.get_num_digits()
+                        # Learning rate
+                        learning_rate = 0.01
+                        rho = 0.9
+
+                        # Optimizer
+                        optimizer = tf.keras.optimizers.RMSprop(learning_rate=learning_rate, rho=rho)
+
+                        # Compile o modelo
+                        lstm_model.compile(
+                            loss='categorical_crossentropy', optimizer=optimizer, metrics=['accuracy'])
 
                         # Definir paciência (patience) e EarlyStopping
                         patience = 10
                         early_stopping = tf.keras.callbacks.EarlyStopping(patience=patience, restore_best_weights=True)
 
-                        # Realizar validação cruzada de 5
-                        num_folds = 5
-                        fold_size = len(X) // num_folds
-                        fold_losses = []
-                        fold_accuracies = []
-
-                        for fold in range(num_folds):
-                            # Dividir dados em treinamento e validação
-                            val_start = fold * fold_size
-                            val_end = (fold + 1) * fold_size
-
-                            X_train = np.concatenate([X[:val_start], X[val_end:]], axis=0)
-                            y_train = np.concatenate([y[:val_start], y[val_end:]], axis=0)
-                            X_val = X[val_start:val_end]
-                            y_val = y[val_start:val_end]
-
-                            # Treinar o modelo com EarlyStopping
-                            lstm_model.compile(
-                                loss='categorical_crossentropy', optimizer='rmsprop', metrics=['accuracy']
-                            )
-                            lstm_model.fit(X_train, y_train, epochs=60, batch_size=32, validation_data=(X_val, y_val),
-                                           callbacks=[early_stopping])
-
-                            # Avaliar o modelo no conjunto de validação
-                            fold_loss, fold_accuracy = lstm_model.evaluate(X_val, y_val)
-                            fold_losses.append(fold_loss)
-                            fold_accuracies.append(fold_accuracy)
-
-                        # Calcular as médias das métricas de validação
-                        mean_loss = np.mean(fold_losses)
-                        mean_accuracy = np.mean(fold_accuracies)
+                        # Treinar o modelo com EarlyStopping
+                        lstm_model.fit(X, y, epochs=60, batch_size=32, callbacks=[early_stopping])
 
                         # Print LSTM model results
                         output_html += "<p>Bidirectional LSTM Model Results:</p>"
