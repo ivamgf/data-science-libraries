@@ -1,6 +1,6 @@
-# Algorithm 2 - BILSTM-CE Model training
+# Algorithm 1 - CRF Model training
 # Dataset cleaning, pre-processing XML and create slots and embeddings
-# RNN Bidiretional LSTM Layer
+# RNN Bidiretional LSTM Layer and CRF Layer
 # Results in file and browser
 
 # Imports
@@ -8,12 +8,13 @@ import os
 import xml.etree.ElementTree as ET
 import webbrowser
 import nltk
-from keras.layers import Dense
 from nltk.tokenize import sent_tokenize, word_tokenize
 import string
 from gensim.models import Word2Vec
 import tensorflow as tf
+import tensorflow_addons as tfa
 import numpy as np
+from tensorflow_addons.layers import CRF
 
 # Downloads
 nltk.download('punkt')
@@ -30,6 +31,10 @@ output_html = ""
 output_html += "<h3>Arquivos encontrados no diretório:</h3>"
 
 slot_number = 1
+
+# Arrays to store word embeddings and training labels
+X_train = []
+y_train = []
 
 # Functions
 
@@ -161,56 +166,51 @@ for file in files:
                         # Word Embeddings
                         for word in context_words:
                             word_embedding = tokenized_sent.wv[word].reshape((100, 1))
+                            X_train.append(word_embedding)
+                            if word == annotated_word:
+                                y_train.append(1)
+                            else:
+                                y_train.append(0)
                             output_html += f"<p>{word}: {word_embedding}</p>"
                         output_html += "</pre>"
+                        output_html += f"<p>Rótulos: {word}: {y_train}</p>"
 
-                        # Bidirectional LSTM model
-                        input_size = word_embedding.shape[-1]
-                        hidden_size = 64
-                        num_classes = 10
-                        sequence_length = 1
+                        # Convert word embeddings to numpy array
+                        word_embeddings = np.array([tokenized_sent.wv[word].reshape((100, 1)) for word in context_words])
 
-                        # Transpose input
-                        word_embedding = np.transpose(word_embedding, (1, 0))
+                        num_classes = 5  # Número de classes
+                        hidden_units = 64  # Unidades ocultas da RNN
 
-                        # Generate example data
-                        num_samples = 1
-                        # Reshape the input data
-                        X = word_embedding.reshape((num_samples, 1, 100))
-                        y = tf.random.uniform((num_samples, num_classes))
+                        # Create RNN with CRF Model using the functional API
+                        inputs = tf.keras.Input(shape=(100, 1))
+                        rnn_output = tf.keras.layers.SimpleRNN(hidden_units, return_sequences=True)(inputs)
+                        dense_output = tf.keras.layers.Dense(num_classes)(rnn_output)
+                        crf_output = CRF(num_classes)(dense_output)
 
-                        # Create Bidirectional LSTM model
-                        lstm_model = tf.keras.Sequential()
-                        lstm_model.add(Dense(units=32))
-                        lstm_model.add(
-                            tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(
-                                hidden_size, input_shape=(1, 120), dropout=0.1)))
-                        lstm_model.add(tf.keras.layers.Dense(num_classes, activation='softmax'))
+                        model = tf.keras.Model(inputs=inputs, outputs=crf_output)
 
-                        # Learning rate
-                        learning_rate = 0.01
-                        rho = 0.9
 
-                        # Optimizer
-                        optimizer = tf.keras.optimizers.RMSprop(learning_rate=learning_rate, rho=rho)
+                        def crf_loss(y_true, y_pred):
+                            crf_layer = model.get_layer('crf')
+                            mask = crf_layer.compute_mask(y_true)
+                            log_likelihood, _ = crf_layer.crf_log_likelihood(y_pred, y_true, mask)
+                            log_likelihood = tf.reduce_mean(-log_likelihood)
+                            return log_likelihood
 
-                        # Compile o modelo
-                        lstm_model.compile(
-                            loss='categorical_crossentropy', optimizer=optimizer, metrics=['accuracy'])
 
-                        # Definir paciência (patience) e EarlyStopping
-                        patience = 10
-                        early_stopping = tf.keras.callbacks.EarlyStopping(patience=patience, restore_best_weights=True)
+                        # Compile
+                        model.compile(optimizer='adam', loss=crf_loss)
 
-                        # Treinar o modelo com EarlyStopping
-                        lstm_model.fit(X, y, epochs=60, batch_size=32, callbacks=[early_stopping])
+                        # Convert the training data to numpy arrays
+                        X_train = np.array(X_train)
+                        y_train = np.array(y_train)
 
-                        # Print LSTM model results
-                        output_html += "<p>Bidirectional LSTM Model Results:</p>"
-                        lstm_results = lstm_model.predict(X)
-                        output_html += f"<pre>{lstm_results}</pre>"
+                        # Reshape y_train to match the CRF layer requirements
+                        y_train = np.expand_dims(y_train, axis=-1)
 
-                        output_html += "</pre>"
+                        # Fit the model using the training data
+                        model.fit(X_train, y_train, epochs=10, batch_size=32)
+
                         slot_number += 1
 
 # Output files path

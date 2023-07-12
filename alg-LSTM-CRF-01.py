@@ -139,6 +139,9 @@ for file in files:
                 num_classes = 10
                 sequence_length = 1
 
+                # Convert sequence_lengths to tf.int32
+                sequence_lengths = tf.keras.backend.cast(sequence_lengths, dtype=tf.int32)
+
                 # Create LSTM model
                 lstm_model = tf.keras.Sequential()
                 lstm_model.add(tf.keras.layers.LSTM(hidden_size, input_shape=(sequence_length, input_size), return_sequences=True))
@@ -149,7 +152,6 @@ for file in files:
 
                 # Apply CRF layer to the LSTM output
                 crf_output = crf_layer(lstm_model.output)
-
 
                 def crf_loss(y_true, y_pred):
                     crf_layer = y_pred._keras_mask
