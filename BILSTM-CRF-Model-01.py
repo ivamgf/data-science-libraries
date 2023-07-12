@@ -1,6 +1,6 @@
-# Algorithm 2 - BILSTM-CE Model training
+# Algorithm 1 - BILSTM-CRF Model training
 # Dataset cleaning, pre-processing XML and create slots and embeddings
-# RNN Bidiretional LSTM Layer
+# RNN Bidiretional LSTM Layer and CRF Layer
 # Results in file and browser
 
 # Imports
@@ -8,12 +8,13 @@ import os
 import xml.etree.ElementTree as ET
 import webbrowser
 import nltk
-from keras.layers import Dense
 from nltk.tokenize import sent_tokenize, word_tokenize
 import string
 from gensim.models import Word2Vec
 import tensorflow as tf
 import numpy as np
+from tensorflow_addons.layers import CRF
+from tensorflow_addons.text import crf_log_likelihood
 
 # Downloads
 nltk.download('punkt')
@@ -32,7 +33,6 @@ output_html += "<h3>Arquivos encontrados no diretório:</h3>"
 slot_number = 1
 
 # Functions
-
 # Function to replace words
 def replace_words(text):
     word_replacements = {
@@ -179,13 +179,18 @@ for file in files:
                         X = word_embedding.reshape((num_samples, 1, 100))
                         y = tf.random.uniform((num_samples, num_classes))
 
-                        # Create Bidirectional LSTM model
-                        lstm_model = tf.keras.Sequential()
-                        lstm_model.add(Dense(units=32))
-                        lstm_model.add(
-                            tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(
-                                hidden_size, input_shape=(1, 120), dropout=0.1)))
-                        lstm_model.add(tf.keras.layers.Dense(num_classes, activation='softmax'))
+                        # Inputs
+                        inputs = tf.keras.Input(shape=(1, 100))
+
+                        # Bidirectional LSTM layer
+                        lstm_layer = tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(hidden_size, dropout=0.1, return_sequences=True))(inputs)
+
+                        # CRF layer
+                        crf_layer = CRF(num_classes)
+                        outputs = crf_layer(lstm_layer)
+
+                        # Create the model
+                        lstm_model = tf.keras.Model(inputs=inputs, outputs=outputs)
 
                         # Learning rate
                         learning_rate = 0.01
@@ -194,15 +199,20 @@ for file in files:
                         # Optimizer
                         optimizer = tf.keras.optimizers.RMSprop(learning_rate=learning_rate, rho=rho)
 
-                        # Compile o modelo
-                        lstm_model.compile(
-                            loss='categorical_crossentropy', optimizer=optimizer, metrics=['accuracy'])
+                        # Compile the model with custom CRF loss function
+                        def crf_loss(y_true, y_pred):
+                            y_pred_expanded = tf.expand_dims(y_pred, axis=1)
+                            crf_loss = -crf_log_likelihood(y_pred_expanded, y_true, crf_layer)
+                            return tf.reduce_mean(crf_loss)
+
+                        # Compile the model
+                        lstm_model.compile(loss=crf_loss, optimizer=optimizer)
 
                         # Definir paciência (patience) e EarlyStopping
                         patience = 10
                         early_stopping = tf.keras.callbacks.EarlyStopping(patience=patience, restore_best_weights=True)
 
-                        # Treinar o modelo com EarlyStopping
+                        # Train the model
                         lstm_model.fit(X, y, epochs=60, batch_size=32, callbacks=[early_stopping])
 
                         # Print LSTM model results
