@@ -1,4 +1,4 @@
-# Algorithm 1 - CRF Model training
+# Algorithm 5 - CRF Model training
 # Dataset cleaning, pre-processing XML and create slots and embeddings
 # RNN Bidiretional LSTM Layer and CRF Layer
 # Results in file and browser
