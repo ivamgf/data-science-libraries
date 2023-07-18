@@ -1,4 +1,4 @@
-# Algorithm 1 - LSTM Model training
+# Algorithm 2 - LSTM Model training
 # Dataset cleaning, pre-processing XML and create slots and embeddings
 # RNN Bidiretional LSTM Layer
 # Results in file and browser
@@ -194,23 +194,37 @@ for file in files:
                         # Optimizer
                         optimizer = tf.keras.optimizers.RMSprop(learning_rate=learning_rate, rho=rho)
 
-                        # Compile o modelo
+                        # Compile the model
                         lstm_model.compile(
                             loss='categorical_crossentropy', optimizer=optimizer, metrics=['accuracy'])
 
-                        # Definir paciência (patience) e EarlyStopping
+                        # Define patience and EarlyStopping
                         patience = 10
                         early_stopping = tf.keras.callbacks.EarlyStopping(patience=patience, restore_best_weights=True)
 
-                        # Treinar o modelo com EarlyStopping
+                        # Train the model with EarlyStopping
                         lstm_model.fit(X, y, epochs=60, batch_size=32, callbacks=[early_stopping])
 
                         # Print LSTM model results
                         output_html += "<p>Bidirectional LSTM Model Results:</p>"
                         lstm_results = lstm_model.predict(X)
-                        output_html += f"<pre>{lstm_results}</pre>"
-
+                        output_html += "<pre>"
+                        # Get the indices of the words in the Slot de Tokens
+                        word_indices = [tokenized_sent.wv.key_to_index[word.lower()] for word in context_words]
+                        # Create a dictionary mapping word indices to LSTM results
+                        results_dict = dict(zip(word_indices, lstm_results[0]))
+                        # Iterate over the words in the Slot de Tokens and print the corresponding LSTM result
+                        for word in context_words:
+                            word_index = tokenized_sent.wv.key_to_index[word.lower()]
+                            result = results_dict.get(word_index, 0.0)  # Default to 0.0 if word index not found
+                            if word == annotated_word:
+                                result = 1.0
+                            output_html += f"<p>{word}: {result}"
+                            if word == annotated_word:
+                                output_html += " [B-ReqTreatment]"
+                            output_html += "</p>"
                         output_html += "</pre>"
+
                         slot_number += 1
 
 # Output files path
