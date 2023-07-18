@@ -1,6 +1,6 @@
-# Algorithm 1 - CRF Model training
+# Algorithm 6 - CRF Model training
 # Dataset cleaning, pre-processing XML and create slots and embeddings
-# RNN Bidiretional LSTM Layer and CRF Layer
+# RNN Bidirectional LSTM Layer and CRF Layer
 # Results in file and browser
 
 # Imports
@@ -12,9 +12,8 @@ from nltk.tokenize import sent_tokenize, word_tokenize
 import string
 from gensim.models import Word2Vec
 import tensorflow as tf
-import tensorflow_addons as tfa
 import numpy as np
-from tensorflow_addons.layers import CRF
+from tensorflow.keras.preprocessing.sequence import pad_sequences
 
 # Downloads
 nltk.download('punkt')
@@ -85,6 +84,10 @@ def tokenize_sentence(sentence):
 
     return model
 
+# Lists to store sentences and labels
+sentences = []
+labels = []
+
 # Loop through files in directory
 for file in files:
     if file.endswith(".xml"):
@@ -94,7 +97,6 @@ for file in files:
         root = tree.getroot()
 
         output_html += f"<h4>Conteúdo do arquivo {file}:</h4>"
-        sentences = []
 
         # Loop through sentences
         for sentence in root.iter('de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Sentence'):
@@ -118,57 +120,28 @@ for file in files:
                     sentence_text = replace_words(sentence_text)
 
                     # Tokenize the sentences
-                    sentences_list = sent_tokenize(sentence_text)
+                    tokenized_sentence = tokenize_sentence(sentence_text)
 
-                    # Prints the sentences and the annotated word
-                    for sent_idx, sent in enumerate(sentences_list[:5]):  # Select up to 5 sentences
-                        tokenized_sent = tokenize_sentence(sent)
-                        annotated_index = tokenized_sent.wv.key_to_index.get(
-                            annotated_word.lower(), -1)
-                        context_start = max(0, annotated_index - 5)
-                        context_end = min(annotated_index + 6, len(tokenized_sent.wv.key_to_index))
-                        context_words = list(tokenized_sent.wv.key_to_index.keys())[context_start:context_end]
-                        context_words.reverse()  # Reverse the word order
+                    # Add labels
+                    labels_list = [1] * len(tokenized_sentence.wv.key_to_index)  # Placeholder labels, all 1s
 
-                        # Print the Instance and Value attributes
-                        for element in root.iter("webanno.custom.Judgmentsentity"):
-                            if (
-                                    "sofa" in element.attrib and
-                                    "begin" in element.attrib and
-                                    "end" in element.attrib and
-                                    "Instance" in element.attrib and
-                                    "Value" in element.attrib
-                            ):
-                                sofa = element.attrib["sofa"]
-                                begin = element.attrib["begin"]
-                                end = element.attrib["end"]
-                                instance = element.attrib["Instance"]
-                                value = element.attrib["Value"]
+                    # Convert tokenized sentence to a list of words
+                    tokenized_sentence = list(tokenized_sentence.wv.key_to_index.keys())
 
-                                instance = replace_words(instance)
-                                value = replace_words(value)
+                    sentences.extend(tokenized_sentence)
+                    labels.extend(labels_list)
 
-                        context_text = ' '.join(context_words)
-                        context_text = context_text.replace(annotated_word, f"[annotation]{annotated_word}[annotation]")
-                        output_html += f"<p>Sentença {slot_number}: {context_text}</p>"
-                        output_html += f"<p>Annotated Word: {annotated_word}</p>"
-                        output_html += f"<p>Instance: {instance}</p>"
-                        output_html += f"<p>Value: {value}</p>"
+# Tokenize the sentences into words
+tokenized_sentences = [word_tokenize(sentence.lower()) for sentence in sentences]
 
-                        # Print the token vector
-                        output_html += f"<p>Slot de Tokens {slot_number}: {context_words}</p>"
-                        output_html += "<pre>"
+# Obtain the maximum sequence length
+max_sequence_length = max(len(sentence) for sentence in tokenized_sentences)
 
-                        # Word Embeddings
-                        for word in context_words:
-                            word_embedding = tokenized_sent.wv[word].reshape((100, 1))
-                            output_html += f"<p>{word}: {word_embedding}</p>"
-                        output_html += "</pre>"
+# Padding for the input sequences
+X = pad_sequences(tokenized_sentences, maxlen=max_sequence_length, dtype='object')
 
-                        # Convert word embeddings to numpy array
-                        word_embeddings = np.array([tokenized_sent.wv[word].reshape((100, 1)) for word in context_words])
-
-                        slot_number += 1
+# Padding for the label sequences
+y = pad_sequences([[label] for label in labels], maxlen=max_sequence_length, value=0, padding='post')
 
 # Output files path
 output_file_txt = os.path.join(output_dir, "output.txt")

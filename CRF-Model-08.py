@@ -1,6 +1,6 @@
-# Algorithm 1 - LSTM Model training
+# Algorithm 8 - CRF Model training
 # Dataset cleaning, pre-processing XML and create slots and embeddings
-# RNN Bidiretional LSTM Layer
+# RNN Bidirectional LSTM Layer and CRF Layer
 # Results in file and browser
 
 # Imports
@@ -8,12 +8,15 @@ import os
 import xml.etree.ElementTree as ET
 import webbrowser
 import nltk
-from keras.layers import Dense
 from nltk.tokenize import sent_tokenize, word_tokenize
 import string
 from gensim.models import Word2Vec
 import tensorflow as tf
 import numpy as np
+from tensorflow.keras.preprocessing.sequence import pad_sequences
+from keras.layers import Dropout
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Embedding, Bidirectional, LSTM, Dense, TimeDistributed
 
 # Downloads
 nltk.download('punkt')
@@ -84,6 +87,10 @@ def tokenize_sentence(sentence):
 
     return model
 
+# Lists to store sentences and labels
+sentences = []
+labels = []
+
 # Loop through files in directory
 for file in files:
     if file.endswith(".xml"):
@@ -93,7 +100,6 @@ for file in files:
         root = tree.getroot()
 
         output_html += f"<h4>Conteúdo do arquivo {file}:</h4>"
-        sentences = []
 
         # Loop through sentences
         for sentence in root.iter('de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Sentence'):
@@ -118,6 +124,69 @@ for file in files:
 
                     # Tokenize the sentences
                     sentences_list = sent_tokenize(sentence_text)
+
+                    # Add labels
+                    labels_list = []
+                    for sent in sentences_list:
+                        label = [1 if word == annotated_word else 0 for word in word_tokenize(sent)]
+                        labels_list.append(label)
+
+                    sentences.extend(sentences_list)
+                    labels.extend(labels_list)
+
+                    # Tokenize the sentences into words
+                    tokenized_sentences = [word_tokenize(sentence.lower()) for sentence in sentences]
+
+                    # Obtain the maximum sequence length
+                    max_sequence_length = max(len(sentence) for sentence in tokenized_sentences)
+
+                    # Padding for the input sequences
+                    X = pad_sequences(tokenized_sentences, maxlen=max_sequence_length, dtype='object')
+
+                    # Padding for the label sequences
+                    y = pad_sequences(labels, maxlen=max_sequence_length, dtype='object')
+
+                    # Convert labels to categorical
+                    y_categorical = tf.keras.utils.to_categorical(y)
+
+                    # Certifique-se de que o número de amostras seja consistente
+                    assert len(X) == len(y_categorical), "O número de amostras em X e y_categorical não é o mesmo."
+
+                    # =============================================================================
+                    # Construção do modelo RNN-CRF
+                    model = Sequential()
+                    model.add(Dense(units=100, activation='relu', input_dim=X.shape[1]))
+                    model.add(Dropout(0.1))
+                    model.add(Dense(units=100, activation='relu'))
+                    model.add(Dropout(0.1))
+                    model.add(Dense(units=max_sequence_length, activation='relu'))
+
+                    # Learning rate
+                    learning_rate = 0.01
+                    rho = 0.9
+
+                    # Optimizer
+                    optimizer = tf.keras.optimizers.RMSprop(learning_rate=learning_rate, rho=rho)
+
+                    # Compilação do modelo
+                    model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy'])
+
+                    # Definir paciência (patience) e EarlyStopping
+                    patience = 10
+                    early_stopping = tf.keras.callbacks.EarlyStopping(patience=patience, restore_best_weights=True)
+
+                    # Treinamento do modelo
+                    model.fit(X, y_categorical, batch_size=32, epochs=60, callbacks=[early_stopping])
+
+                    # Avaliação do modelo
+                    loss, accuracy = model.evaluate(X, y_categorical)
+                    print('Loss:', loss)
+                    print('Accuracy:', accuracy)
+
+                    # Predição usando o modelo treinado
+                    predictions = model.predict(X)
+
+                    # =============================================================================
 
                     # Prints the sentences and the annotated word
                     for sent_idx, sent in enumerate(sentences_list[:5]):  # Select up to 5 sentences
@@ -156,6 +225,7 @@ for file in files:
 
                         # Print the token vector
                         output_html += f"<p>Slot de Tokens {slot_number}: {context_words}</p>"
+                        output_html += f"<p>Rótulos {slot_number}: {y[sent_idx]}</p>"
                         output_html += "<pre>"
 
                         # Word Embeddings
@@ -164,53 +234,6 @@ for file in files:
                             output_html += f"<p>{word}: {word_embedding}</p>"
                         output_html += "</pre>"
 
-                        # Bidirectional LSTM model
-                        input_size = word_embedding.shape[-1]
-                        hidden_size = 64
-                        num_classes = 10
-                        sequence_length = 1
-
-                        # Transpose input
-                        word_embedding = np.transpose(word_embedding, (1, 0))
-
-                        # Generate example data
-                        num_samples = 1
-                        # Reshape the input data
-                        X = word_embedding.reshape((num_samples, 1, 100))
-                        y = tf.random.uniform((num_samples, num_classes))
-
-                        # Create Bidirectional LSTM model
-                        lstm_model = tf.keras.Sequential()
-                        lstm_model.add(Dense(units=32))
-                        lstm_model.add(
-                            tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(
-                                hidden_size, input_shape=(1, 120), dropout=0.1)))
-                        lstm_model.add(tf.keras.layers.Dense(num_classes, activation='softmax'))
-
-                        # Learning rate
-                        learning_rate = 0.01
-                        rho = 0.9
-
-                        # Optimizer
-                        optimizer = tf.keras.optimizers.RMSprop(learning_rate=learning_rate, rho=rho)
-
-                        # Compile o modelo
-                        lstm_model.compile(
-                            loss='categorical_crossentropy', optimizer=optimizer, metrics=['accuracy'])
-
-                        # Definir paciência (patience) e EarlyStopping
-                        patience = 10
-                        early_stopping = tf.keras.callbacks.EarlyStopping(patience=patience, restore_best_weights=True)
-
-                        # Treinar o modelo com EarlyStopping
-                        lstm_model.fit(X, y, epochs=60, batch_size=32, callbacks=[early_stopping])
-
-                        # Print LSTM model results
-                        output_html += "<p>Bidirectional LSTM Model Results:</p>"
-                        lstm_results = lstm_model.predict(X)
-                        output_html += f"<pre>{lstm_results}</pre>"
-
-                        output_html += "</pre>"
                         slot_number += 1
 
 # Output files path

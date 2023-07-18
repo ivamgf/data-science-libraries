@@ -1,6 +1,6 @@
-# Algorithm 1 - LSTM Model training
+# Algorithm 5 - CRF Model training
 # Dataset cleaning, pre-processing XML and create slots and embeddings
-# RNN Bidiretional LSTM Layer
+# RNN Bidiretional LSTM Layer and CRF Layer
 # Results in file and browser
 
 # Imports
@@ -8,12 +8,13 @@ import os
 import xml.etree.ElementTree as ET
 import webbrowser
 import nltk
-from keras.layers import Dense
 from nltk.tokenize import sent_tokenize, word_tokenize
 import string
 from gensim.models import Word2Vec
 import tensorflow as tf
+import tensorflow_addons as tfa
 import numpy as np
+from tensorflow_addons.layers import CRF
 
 # Downloads
 nltk.download('punkt')
@@ -164,53 +165,9 @@ for file in files:
                             output_html += f"<p>{word}: {word_embedding}</p>"
                         output_html += "</pre>"
 
-                        # Bidirectional LSTM model
-                        input_size = word_embedding.shape[-1]
-                        hidden_size = 64
-                        num_classes = 10
-                        sequence_length = 1
+                        # Convert word embeddings to numpy array
+                        word_embeddings = np.array([tokenized_sent.wv[word].reshape((100, 1)) for word in context_words])
 
-                        # Transpose input
-                        word_embedding = np.transpose(word_embedding, (1, 0))
-
-                        # Generate example data
-                        num_samples = 1
-                        # Reshape the input data
-                        X = word_embedding.reshape((num_samples, 1, 100))
-                        y = tf.random.uniform((num_samples, num_classes))
-
-                        # Create Bidirectional LSTM model
-                        lstm_model = tf.keras.Sequential()
-                        lstm_model.add(Dense(units=32))
-                        lstm_model.add(
-                            tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(
-                                hidden_size, input_shape=(1, 120), dropout=0.1)))
-                        lstm_model.add(tf.keras.layers.Dense(num_classes, activation='softmax'))
-
-                        # Learning rate
-                        learning_rate = 0.01
-                        rho = 0.9
-
-                        # Optimizer
-                        optimizer = tf.keras.optimizers.RMSprop(learning_rate=learning_rate, rho=rho)
-
-                        # Compile o modelo
-                        lstm_model.compile(
-                            loss='categorical_crossentropy', optimizer=optimizer, metrics=['accuracy'])
-
-                        # Definir paciência (patience) e EarlyStopping
-                        patience = 10
-                        early_stopping = tf.keras.callbacks.EarlyStopping(patience=patience, restore_best_weights=True)
-
-                        # Treinar o modelo com EarlyStopping
-                        lstm_model.fit(X, y, epochs=60, batch_size=32, callbacks=[early_stopping])
-
-                        # Print LSTM model results
-                        output_html += "<p>Bidirectional LSTM Model Results:</p>"
-                        lstm_results = lstm_model.predict(X)
-                        output_html += f"<pre>{lstm_results}</pre>"
-
-                        output_html += "</pre>"
                         slot_number += 1
 
 # Output files path
