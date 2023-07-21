@@ -218,10 +218,12 @@ for file in files:
                             word_index = tokenized_sent.wv.key_to_index[word.lower()]
                             result = results_dict.get(word_index, 0.0)  # Default to 0.0 if word index not found
                             if word == annotated_word:
-                                result = 1.0
+                                result = results_dict.get(word_index, 0.0)
                             output_html += f"<p>{word}: {result}"
+                            if word != annotated_word:
+                                output_html += " - [O]"
                             if word == annotated_word:
-                                output_html += " [B-ReqTreatment]"
+                                output_html += " - [B-ReqTreatment]"
                             output_html += "</p>"
                         output_html += "</pre>"
 

@@ -1,6 +1,6 @@
-# Algorithm 4 - LSTM Model training
+# Algorithm 5 - LSTM Model training
 # Dataset cleaning, pre-processing XML and create slots and embeddings
-# RNN Bidiretional LSTM Layer
+# RNN Bidiretional LSTM Layer with cross-validation
 # Results in file and browser
 
 # Imports
@@ -157,69 +157,6 @@ for file in files:
 
            # Initialize a list to store results for this fold
             fold_results = []
-
-            # Tokenize the sentences
-            sentences_list = sent_tokenize(sentence_text)
-
-            # Prints the sentences and the annotated word
-            for sent_idx, sent in enumerate(sentences_list[:5]):  # Select up to 5 sentences
-                tokenized_sent = tokenize_sentence(sent)
-                annotated_index = tokenized_sent.wv.key_to_index.get(
-                    annotated_word.lower(), -1)
-                context_start = max(0, annotated_index - 5)
-                context_end = min(annotated_index + 6, len(tokenized_sent.wv.key_to_index))
-                context_words = list(tokenized_sent.wv.key_to_index.keys())[context_start:context_end]
-                context_words.reverse()  # Reverse the word order
-
-            # Word Embeddings
-            for word in context_words:
-                word_embedding = tokenized_sent.wv[word].reshape((100, 1))
-
-                # Bidirectional LSTM model
-                input_size = word_embedding.shape[-1]
-                hidden_size = 64
-                num_classes = 10
-                sequence_length = 1
-
-                # Transpose input
-                word_embedding = np.transpose(word_embedding, (1, 0))
-
-                # Generate example data
-                num_samples = 1
-                # Reshape the input data
-                X = word_embedding.reshape((num_samples, 1, 100))
-                y = tf.random.uniform((num_samples, num_classes))
-
-                # Create Bidirectional LSTM model
-                lstm_model = tf.keras.Sequential()
-                lstm_model.add(Dense(units=32))
-                lstm_model.add(
-                    tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(
-                        hidden_size, input_shape=(1, 120), dropout=0.1)))
-                lstm_model.add(tf.keras.layers.Dense(num_classes, activation='softmax'))
-
-                # Learning rate
-                learning_rate = 0.01
-                rho = 0.9
-
-                # Optimizer
-                optimizer = tf.keras.optimizers.RMSprop(learning_rate=learning_rate, rho=rho)
-
-                # Compile the model
-                lstm_model.compile(
-                    loss='categorical_crossentropy', optimizer=optimizer, metrics=['accuracy'])
-
-                # Define patience and EarlyStopping
-                patience = 10
-                early_stopping = tf.keras.callbacks.EarlyStopping(patience=patience, restore_best_weights=True)
-
-                # Train the model with EarlyStopping
-                lstm_model.fit(X, y, epochs=60, batch_size=32, callbacks=[early_stopping])
-
-                lstm_results = lstm_model.predict(X)
-
-                # Append the results for this fold to the list
-                fold_results.append(lstm_results)
 
 # Loop through files in directory
 for file in files:
