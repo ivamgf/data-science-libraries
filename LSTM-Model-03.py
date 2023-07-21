@@ -1,4 +1,4 @@
-# Algorithm 2 - LSTM Model training
+# Algorithm 3 - LSTM Model training
 # Dataset cleaning, pre-processing XML and create slots and embeddings
 # RNN Bidiretional LSTM Layer
 # Results in file and browser
@@ -84,6 +84,27 @@ def tokenize_sentence(sentence):
 
     return model
 
+# Function to split the data into 5 parts
+def split_data(sentences, num_folds=5):
+    fold_size = len(sentences) // num_folds
+    data_folds = []
+    for i in range(num_folds):
+        fold_start = i * fold_size
+        fold_end = fold_start + fold_size
+        data_folds.append(sentences[fold_start:fold_end])
+    return data_folds
+
+# Function to get the training and testing data for a specific fold
+def get_fold_data(data_folds, fold_idx):
+    training_data = []
+    testing_data = []
+    for i, data_fold in enumerate(data_folds):
+        if i == fold_idx:
+            testing_data.extend(data_fold)
+        else:
+            training_data.extend(data_fold)
+    return training_data, testing_data
+
 # Loop through files in directory
 for file in files:
     if file.endswith(".xml"):
@@ -164,46 +185,59 @@ for file in files:
                             output_html += f"<p>{word}: {word_embedding}</p>"
                         output_html += "</pre>"
 
-                        # Bidirectional LSTM model
-                        input_size = word_embedding.shape[-1]
-                        hidden_size = 64
-                        num_classes = 10
-                        sequence_length = 1
+                        # Collect all sentences from the loop
+                        all_sentences = sentences
 
-                        # Transpose input
-                        word_embedding = np.transpose(word_embedding, (1, 0))
+                        # Split data into 5 parts (5-fold cross-validation)
+                        data_folds = split_data(all_sentences)
 
-                        # Generate example data
-                        num_samples = 1
-                        # Reshape the input data
-                        X = word_embedding.reshape((num_samples, 1, 100))
-                        y = tf.random.uniform((num_samples, num_classes))
+                        # Perform 5-fold cross-validation
+                        for fold_idx in range(5):
+                            slot_number = 1
 
-                        # Create Bidirectional LSTM model
-                        lstm_model = tf.keras.Sequential()
-                        lstm_model.add(Dense(units=32))
-                        lstm_model.add(
-                            tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(
-                                hidden_size, input_shape=(1, 120), dropout=0.1)))
-                        lstm_model.add(tf.keras.layers.Dense(num_classes, activation='softmax'))
+                            # Get training and testing data for this fold
+                            training_data, testing_data = get_fold_data(data_folds, fold_idx)
 
-                        # Learning rate
-                        learning_rate = 0.01
-                        rho = 0.9
+                            # Bidirectional LSTM model
+                            input_size = word_embedding.shape[-1]
+                            hidden_size = 64
+                            num_classes = 10
+                            sequence_length = 1
 
-                        # Optimizer
-                        optimizer = tf.keras.optimizers.RMSprop(learning_rate=learning_rate, rho=rho)
+                            # Transpose input
+                            word_embedding = np.transpose(word_embedding, (1, 0))
 
-                        # Compile the model
-                        lstm_model.compile(
-                            loss='categorical_crossentropy', optimizer=optimizer, metrics=['accuracy'])
+                            # Generate example data
+                            num_samples = 1
+                            # Reshape the input data
+                            X = word_embedding.reshape((num_samples, 1, 100))
+                            y = tf.random.uniform((num_samples, num_classes))
 
-                        # Define patience and EarlyStopping
-                        patience = 10
-                        early_stopping = tf.keras.callbacks.EarlyStopping(patience=patience, restore_best_weights=True)
+                            # Create Bidirectional LSTM model
+                            lstm_model = tf.keras.Sequential()
+                            lstm_model.add(Dense(units=32))
+                            lstm_model.add(
+                                tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(
+                                    hidden_size, input_shape=(1, 120), dropout=0.1)))
+                            lstm_model.add(tf.keras.layers.Dense(num_classes, activation='softmax'))
 
-                        # Train the model with EarlyStopping
-                        lstm_model.fit(X, y, epochs=60, batch_size=32, callbacks=[early_stopping])
+                            # Learning rate
+                            learning_rate = 0.01
+                            rho = 0.9
+
+                            # Optimizer
+                            optimizer = tf.keras.optimizers.RMSprop(learning_rate=learning_rate, rho=rho)
+
+                            # Compile the model
+                            lstm_model.compile(
+                                loss='categorical_crossentropy', optimizer=optimizer, metrics=['accuracy'])
+
+                            # Define patience and EarlyStopping
+                            patience = 10
+                            early_stopping = tf.keras.callbacks.EarlyStopping(patience=patience, restore_best_weights=True)
+
+                            # Train the model with EarlyStopping
+                            lstm_model.fit(X, y, epochs=60, batch_size=32, callbacks=[early_stopping])
 
                         # Print LSTM model results
                         output_html += "<p>Bidirectional LSTM Model Results:</p>"

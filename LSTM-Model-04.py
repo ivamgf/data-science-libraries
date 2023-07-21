@@ -1,10 +1,11 @@
-# Algorithm 2 - LSTM Model training
+# Algorithm 4 - LSTM Model training
 # Dataset cleaning, pre-processing XML and create slots and embeddings
 # RNN Bidiretional LSTM Layer
 # Results in file and browser
 
 # Imports
 import os
+
 import xml.etree.ElementTree as ET
 import webbrowser
 import nltk
@@ -84,6 +85,30 @@ def tokenize_sentence(sentence):
 
     return model
 
+# Function to split the data into 5 parts
+def split_data(sentences, num_folds=5):
+    fold_size = len(sentences) // num_folds
+    data_folds = []
+    for i in range(num_folds):
+        fold_start = i * fold_size
+        fold_end = fold_start + fold_size
+        data_folds.append(sentences[fold_start:fold_end])
+    return data_folds
+
+# Function to get the training and testing data for a specific fold
+def get_fold_data(data_folds, fold_idx):
+    training_data = []
+    testing_data = []
+    for i, data_fold in enumerate(data_folds):
+        if i == fold_idx:
+            testing_data.extend(data_fold)
+        else:
+            training_data.extend(data_fold)
+    return training_data, testing_data
+
+# List to store the results for each fold
+fold_results = []
+
 # Loop through files in directory
 for file in files:
     if file.endswith(".xml"):
@@ -113,21 +138,153 @@ for file in files:
                 if sentence_text not in sentences:
                     sentences.append(sentence_text)
 
-                    # Apply word replacements
-                    sentence_text = replace_words(sentence_text)
+    # Split data into 5 parts (5-fold cross-validation)
+    data_folds = split_data(sentences)
 
-                    # Tokenize the sentences
-                    sentences_list = sent_tokenize(sentence_text)
+    # Perform 5-fold cross-validation
+    for fold_idx in range(5):
+        slot_number = 1
 
-                    # Prints the sentences and the annotated word
-                    for sent_idx, sent in enumerate(sentences_list[:5]):  # Select up to 5 sentences
-                        tokenized_sent = tokenize_sentence(sent)
-                        annotated_index = tokenized_sent.wv.key_to_index.get(
-                            annotated_word.lower(), -1)
-                        context_start = max(0, annotated_index - 5)
-                        context_end = min(annotated_index + 6, len(tokenized_sent.wv.key_to_index))
-                        context_words = list(tokenized_sent.wv.key_to_index.keys())[context_start:context_end]
-                        context_words.reverse()  # Reverse the word order
+        # Get training and testing data for this fold
+        training_data, testing_data = get_fold_data(data_folds, fold_idx)
+
+        # Tokenize and create the Word2Vec model only if training data is available
+        if training_data:
+            all_tokens = [word_tokenize(sentence) for sentence in training_data]
+            all_tokens = [token.lower() for tokens in all_tokens for token in tokens if
+                          token.lower() not in string.punctuation]
+            model = Word2Vec(sentences=all_tokens, min_count=1, workers=2, sg=1, window=5)
+
+           # Initialize a list to store results for this fold
+            fold_results = []
+
+            # Tokenize the sentences
+            sentences_list = sent_tokenize(sentence_text)
+
+            # Prints the sentences and the annotated word
+            for sent_idx, sent in enumerate(sentences_list[:5]):  # Select up to 5 sentences
+                tokenized_sent = tokenize_sentence(sent)
+                annotated_index = tokenized_sent.wv.key_to_index.get(
+                    annotated_word.lower(), -1)
+                context_start = max(0, annotated_index - 5)
+                context_end = min(annotated_index + 6, len(tokenized_sent.wv.key_to_index))
+                context_words = list(tokenized_sent.wv.key_to_index.keys())[context_start:context_end]
+                context_words.reverse()  # Reverse the word order
+
+            # Word Embeddings
+            for word in context_words:
+                word_embedding = tokenized_sent.wv[word].reshape((100, 1))
+
+                # Bidirectional LSTM model
+                input_size = word_embedding.shape[-1]
+                hidden_size = 64
+                num_classes = 10
+                sequence_length = 1
+
+                # Transpose input
+                word_embedding = np.transpose(word_embedding, (1, 0))
+
+                # Generate example data
+                num_samples = 1
+                # Reshape the input data
+                X = word_embedding.reshape((num_samples, 1, 100))
+                y = tf.random.uniform((num_samples, num_classes))
+
+                # Create Bidirectional LSTM model
+                lstm_model = tf.keras.Sequential()
+                lstm_model.add(Dense(units=32))
+                lstm_model.add(
+                    tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(
+                        hidden_size, input_shape=(1, 120), dropout=0.1)))
+                lstm_model.add(tf.keras.layers.Dense(num_classes, activation='softmax'))
+
+                # Learning rate
+                learning_rate = 0.01
+                rho = 0.9
+
+                # Optimizer
+                optimizer = tf.keras.optimizers.RMSprop(learning_rate=learning_rate, rho=rho)
+
+                # Compile the model
+                lstm_model.compile(
+                    loss='categorical_crossentropy', optimizer=optimizer, metrics=['accuracy'])
+
+                # Define patience and EarlyStopping
+                patience = 10
+                early_stopping = tf.keras.callbacks.EarlyStopping(patience=patience, restore_best_weights=True)
+
+                # Train the model with EarlyStopping
+                lstm_model.fit(X, y, epochs=60, batch_size=32, callbacks=[early_stopping])
+
+                lstm_results = lstm_model.predict(X)
+
+                # Append the results for this fold to the list
+                fold_results.append(lstm_results)
+
+# Loop through files in directory
+for file in files:
+    if file.endswith(".xml"):
+        xml_file = os.path.join(path, file)
+        tree = ET.parse(xml_file)
+        root = tree.getroot()
+
+        sentences = []
+
+        # Loop through sentences
+        for sentence in root.iter('de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Sentence'):
+            tokens = []
+            for token in sentence.iter('de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Token'):
+                tokens.append(token.text.strip())
+
+            # Checks if the sentence contains the specific tags
+            if sentence.find(".//webanno.custom.Judgmentsentity") is not None:
+                annotated_word = sentence.find(
+                    ".//webanno.custom.Judgmentsentity/de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Token").text.strip()
+                annotated_word = replace_expression(
+                    annotated_word)  # Substitui o conteúdo de annotated_word
+
+                sentence_text = ' '.join(tokens)
+
+                # Checks if the sentence has already been added
+                if sentence_text not in sentences:
+                    sentences.append(sentence_text)
+
+            # Loop through sentences again to process them for LSTM model (separated from the previous loop)
+            for sentence in root.iter('de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Sentence'):
+                tokens = []
+                for token in sentence.iter('de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Token'):
+                    tokens.append(token.text.strip())
+
+                # Checks if the sentence contains the specific tags
+                if sentence.find(".//webanno.custom.Judgmentsentity") is not None:
+                    annotated_word = sentence.find(
+                        ".//webanno.custom.Judgmentsentity/de.tudarmstadt.ukp.dkpro.core.api.segmentation.type.Token").text.strip()
+                    annotated_word = replace_expression(annotated_word)  # Substitui o conteúdo de annotated_word
+
+                    sentence_text = ' '.join(tokens)
+
+                    # Checks if the sentence has already been added
+                    if sentence_text not in sentences:
+                        sentences.append(sentence_text)
+
+                        # Collect all sentences from the loop
+                        all_sentences = sentences
+
+                        # Apply word replacements
+                        sentence_text = replace_words(sentence_text)
+
+                        # Tokenize the sentences
+                        sentences_list = sent_tokenize(sentence_text)
+
+                        # Prints the sentences and the annotated word
+                        for sent_idx, sent in enumerate(sentences_list[:5]):  # Select up to 5 sentences
+                            tokenized_sent = tokenize_sentence(sent)
+                            annotated_index = tokenized_sent.wv.key_to_index.get(
+                                annotated_word.lower(), -1)
+                            context_start = max(0, annotated_index - 5)
+                            context_end = min(annotated_index + 6, len(tokenized_sent.wv.key_to_index))
+                            context_words = list(tokenized_sent.wv.key_to_index.keys())[context_start:context_end]
+                            context_words.reverse()  # Reverse the word order
 
                         # Print the Instance and Value attributes
                         for element in root.iter("webanno.custom.Judgmentsentity"):
@@ -228,6 +385,13 @@ for file in files:
                         output_html += "</pre>"
 
                         slot_number += 1
+
+                        # Append the results for this fold to the list
+                        fold_results.append(lstm_results)
+
+                        # Calculate and print average results for all folds
+                        average_results = np.mean(fold_results, axis=0)
+                        output_html += f"<p>Average LSTM Model Results: {average_results}</p>"
 
 # Output files path
 output_file_txt = os.path.join(output_dir, "output.txt")
