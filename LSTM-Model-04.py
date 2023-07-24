@@ -5,16 +5,15 @@
 
 # Imports
 import os
-
 import xml.etree.ElementTree as ET
 import webbrowser
 import nltk
-from keras.layers import Dense
 from nltk.tokenize import sent_tokenize, word_tokenize
 import string
 from gensim.models import Word2Vec
 import tensorflow as tf
 import numpy as np
+from keras.layers import Dense
 
 # Downloads
 nltk.download('punkt')
