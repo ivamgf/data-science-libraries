@@ -1,22 +1,19 @@
+# Algorithm 01 pre-processing PDF files
+
+# Imports
 import os
 import nltk
 import PyPDF2
 from nltk.tokenize import sent_tokenize, word_tokenize
-from nltk.corpus import stopwords
-import string
 
 # Downloads
 nltk.download('punkt')
-nltk.download('stopwords')
 
 # Use double backslashes in file or directory path
 path = "C:\\Dataset"
 
 # Get a list of files in the directory
 files = os.listdir(path)
-
-# Define the list of stopwords for the Portuguese language and punctuations
-stop_words = set(stopwords.words('portuguese') + list(string.punctuation))
 
 # Print the file list
 print("Files found in the directory:")
@@ -45,12 +42,8 @@ for filename in files:
             for sentence in sentences:
                 words = word_tokenize(sentence.lower(), language='portuguese')
 
-                # Filter stop words and scores
-                filtered_words = [word for word in words if
-                                  word not in stop_words and word not in string.punctuation]
-
                 # Put the filtered words back together into sentences
-                filtered_sentence = ' '.join(filtered_words)
+                filtered_sentence = ' '.join(words)
 
                 # Check if the sentence contains the word "VISTOS"
                 if 'vistos' in filtered_sentence:
